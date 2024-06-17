@@ -15,7 +15,9 @@ def init_db():
             image TEXT NOT NULL,
             name TEXT NOT NULL,
             author TEXT NOT NULL,
-            tools TEXT NOT NULL
+            tools TEXT NOT NULL,
+            popularity INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     cursor.execute('''
@@ -55,9 +57,15 @@ def submit_form():
 
 @app.route('/gallery')
 def gallery():
+    sort_by = request.args.get('sort', 'new')
     conn = sqlite3.connect('gallery.db')
     cursor = conn.cursor()
-    cursor.execute('SELECT id, image, name FROM GalleryItem')
+    
+    if sort_by == 'popular':
+        cursor.execute('SELECT id, image, name FROM GalleryItem ORDER BY popularity DESC')
+    else:  # Default to sorting by new
+        cursor.execute('SELECT id, image, name FROM GalleryItem ORDER BY created_at DESC')
+    
     items = cursor.fetchall()
     conn.close()
     
@@ -85,24 +93,6 @@ def gallery_item(item_id):
         })
     else:
         return jsonify({'message': 'Item not found'}), 404
-
-@app.route('/submit_comment', methods=['POST'])
-def submit_comment():
-    data = request.get_json()
-    gallery_item_id = data['gallery_item_id']
-    name = data['name']
-    comment = data['comment']
-
-    conn = sqlite3.connect('gallery.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO Comments (gallery_item_id, name, comment)
-        VALUES (?, ?, ?)
-    ''', (gallery_item_id, name, comment))
-    conn.commit()
-    conn.close()
-    
-    return jsonify(message='Комментарий успешно добавлен!')
 
 @app.route('/submit_gallery_item', methods=['POST'])
 def submit_gallery_item():
@@ -135,6 +125,24 @@ def submit_gallery_item():
         conn.close()
     
         return jsonify(message='Галерея успешно обновлена!')
+    
+@app.route('/submit_comment', methods=['POST'])
+def submit_comment():
+    data = request.get_json()
+    gallery_item_id = data['gallery_item_id']
+    name = data['name']
+    comment = data['comment']
+
+    conn = sqlite3.connect('gallery.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO Comments (gallery_item_id, name, comment)
+        VALUES (?, ?, ?)
+    ''', (gallery_item_id, name, comment))
+    conn.commit()
+    conn.close()
+    
+    return jsonify(message='Комментарий успешно добавлен!')
 
 if __name__ == '__main__':
     if not os.path.exists(UPLOAD_FOLDER):
